@@ -1,8 +1,12 @@
 'use strict';
 import api from './api';
 import request from './request';
-import { getInterestResults, getTrendingResults,
-          constructInterestObj, constructTrendingObj } from './utilities';
+import {
+  getInterestResults,
+  constructInterestObj,
+  constructTrendingObj,
+  getTrendingResultsV2,
+} from './utilities';
 
 const interestHandler = {
   processor: getInterestResults,
@@ -10,7 +14,7 @@ const interestHandler = {
 };
 
 const trendHandler = {
-  processor: getTrendingResults,
+  processor: getTrendingResultsV2,
   objectConstructor: constructTrendingObj,
 };
 
@@ -19,6 +23,7 @@ const apiRequest = api.bind(this, request);
 export default {
   autoComplete: apiRequest('Auto complete', interestHandler),
   dailyTrends: apiRequest('Daily trends', trendHandler),
+  dailyTrendsV2: apiRequest('Daily trends', trendHandler),
   interestByRegion: apiRequest('Interest by region', interestHandler),
   interestOverTime: apiRequest('Interest over time', interestHandler),
   realTimeTrends: apiRequest('Real time trends', trendHandler),
