@@ -49,6 +49,7 @@ Optional callback function where the first parameter is an error and the second 
   * [API Methods](#api-methods)
     * [autoComplete](#autocomplete)
     * [dailyTrends](#dailyTrends)
+    * [dailyTrendsV2](#dailyTrends)
     * [interestOverTime](#interestovertime)
     * [interestByRegion](#interestbyregion)
     * [realTimeTrends](#realTimeTrends)
@@ -145,6 +146,8 @@ The following API methods are available:
 * [autoComplete](#autocomplete): Returns the results from the "Add a search term" input box in the google trends UI. These results (Topics) can then be used in the other API methods. **Note**: Search terms and Topics are measured differently, so `relatedTopics` will not work with comparisons that contain both Search terms and Topics.
 
 * [dailyTrends](#dailyTrends): Daily Search Trends highlights searches that jumped significantly in traffic among all searches over the past 24 hours and updates hourly. These search trends show the specific queries that were searched, and the absolute number of searches made. 20 daily trending search results are returned.You can search retroactively for up to 15 days in the past.
+
+* [dailyTrendsV2](#dailyTrendsV2): Daily Search Trends highlights searches that jumped significantly in traffic among all searches over the past 24 hours and updates hourly. These search trends show the specific queries that were searched, and the absolute number of searches made. This is WIP V2 API endpoint for daily trends. until google changes the API again or we get all the RPC calls and its payload. Eventually We need to make this the default endpoint for daily trends and change all apis with new endpoints.
 
 * [interestOverTime](#interestovertime): Numbers represent search interest relative to the highest point on the chart for the given region and time. A value of 100 is the peak popularity for the term. A value of 50 means that the term is half as popular. Likewise a score of 0 means the term was less than 1% as popular as the peak. If you use multiple keywords for a comparison, the return data will also contain an average result for each keyword.
 
@@ -256,6 +259,51 @@ googleTrends.dailyTrends({
     }
     endDateForNextRequest : String,
     rssFeedPageUrl : String,
+  }
+}
+```
+
+[back to top](#introduction)
+
+<hr>
+
+#### dailyTrends
+*Daily Search Trends highlights searches that jumped significantly in traffic among all searches over the past 24 hours and updates hourly. These search trends show the specific queries that were searched, and the absolute number of searches made. 20 daily trending search results are returned*
+
+##### Syntax
+`googleTrends.dailyTrends({ geo: string }, cbFunc)`
+
+Requires an `object` as the first parameter with the following keys:
+
+* `geo` - **required** - type `string` - geocode for a country. For example, `geo: 'US'` will target United States or `geo: 'FR'` will target France. 
+* `hl` - *optional* - type `string` - preferred language code for results (defaults to english). 
+* `timezone` - *optional* - type `number` - preferred timezone (defaults to the time zone difference, in minutes, from UTC to current locale (host system settings))
+* `trendDate` - *optional* - type `Date` object - the date you are interesting in retrieving trends information for (defaults to the current date). **Note that querying for a date more than 15 days in the past will result in an error.**
+
+Optional callback `function` as the second parameter (otherwise returns a promise)
+
+##### Example
+Returning real time trending stories for the United States region.
+
+###### Input
+```js
+googleTrends.dailyTrendsV2({
+  geo: 'US',
+}, function(err, results) {
+  if (err) {
+    console.log(err);
+  }else{
+    console.log(results);
+  }
+});
+```
+
+###### Output
+```js
+{
+  default : [Object]{
+    allTrendingStories: [Array], // unfiltered response from google
+    summary: [Array] // Array of string with daily trends
   }
 }
 ```

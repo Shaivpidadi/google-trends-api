@@ -129,4 +129,20 @@
 //    }else{
 //      console.log(results);
 //    }
-// }); 
+// });
+
+/* ***********************  Daily Trends *******************************/
+// This is WIP V2 API endpoint for daily trends, until google changes the API again
+// or we get all the RPC calls and its payload.
+// Eventually We need to make this the default endpoint for
+// daily trends and change all apis with new endpoints.
+
+// googleTrends.dailyTrendsV2({
+//    geo: 'US',
+// }, function(err, results) {
+//    if (err) {
+//      console.log('oh no error!', err);
+//    }else{
+//      console.log(results);
+//    }
+// });

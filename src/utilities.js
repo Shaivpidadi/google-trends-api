@@ -1,6 +1,48 @@
 'use strict';
+const querystring = require('querystring');
+
 export function isLessThan7Days(date1, date2) {
   return (Math.abs(date2 - date1) / (24 * 60 * 60 * 1000)) < 7;
+}
+
+function updateResponseObject(data) {
+
+  if (!data) {
+    return null;
+  }
+
+  const allTrendingStories = data;
+  const summary = [];
+
+  data.forEach((data) => {
+    summary.push(data[0]);
+  });
+
+  return { allTrendingStories, summary };
+}
+
+function extractJsonFromResponse(text) {
+  /**
+   * Extracts the nested JSON object from the API response.
+   */
+  const lines = text.split('\n');
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const intermediate = JSON.parse(trimmed);
+        const data = JSON.parse(intermediate[0][2]);
+
+        return updateResponseObject(data[1]);
+      } catch (e) {
+        console.warn(`Error parsing JSON: ${e.message}`);
+        continue;
+      }
+    }
+  }
+  return null;
 }
 
 export function convertDateToString(d, shouldIncludeTime, formatWithoutDashes) {
@@ -241,63 +283,63 @@ export function getInterestResults(request) {
     const { path, resolution, _id } = map[searchType];
 
     return request(options)
-    .then((results) => {
-      const parsedResults = parseResults(results);
+      .then((results) => {
+        const parsedResults = parseResults(results);
 
-      /**
-       * Search for the id that matches the search result
-       * Auto complete does not have results on initial query
-       * so just pass the first available result with request
-      */
-      const resultObj = parsedResults.find(({ id = '', request }) => {
-        return id.indexOf(_id) > -1 ||
-          (searchType === 'Auto complete' && request);
-      });
+        /**
+         * Search for the id that matches the search result
+         * Auto complete does not have results on initial query
+         * so just pass the first available result with request
+        */
+        const resultObj = parsedResults.find(({ id = '', request }) => {
+          return id.indexOf(_id) > -1 ||
+            (searchType === 'Auto complete' && request);
+        });
 
-      if (!resultObj) {
-        const errObj = {
-          message: 'Available widgets does not contain selected api type',
-          requestBody: results,
+        if (!resultObj) {
+          const errObj = {
+            message: 'Available widgets does not contain selected api type',
+            requestBody: results,
+          };
+
+          throw errObj;
+        }
+
+        let req = resultObj.request;
+        const token = resultObj.token;
+
+        if (resolution) req.resolution = resolution;
+        req.requestOptions.category = obj.category;
+        req.requestOptions.property = obj.property;
+        req = JSON.stringify(req);
+
+        const nextOptions = {
+          path,
+          method: 'GET',
+          host: 'trends.google.com',
+          qs: {
+            hl: obj.hl,
+            req,
+            token,
+            tz: obj.timezone,
+          },
         };
 
-        throw errObj;
-      }
+        if (obj.agent) nextOptions.agent = obj.agent;
 
-      let req = resultObj.request;
-      const token = resultObj.token;
+        return request(nextOptions);
+      })
+      .then((res) => {
+        try {
+          /** JSON.parse will decode unicode */
+          const results = JSON.stringify(JSON.parse(res.slice(5)));
 
-      if (resolution) req.resolution = resolution;
-      req.requestOptions.category = obj.category;
-      req.requestOptions.property = obj.property;
-      req = JSON.stringify(req);
-
-      const nextOptions = {
-        path,
-        method: 'GET',
-        host: 'trends.google.com',
-        qs: {
-          hl: obj.hl,
-          req,
-          token,
-          tz: obj.timezone,
-        },
-      };
-
-      if (obj.agent) nextOptions.agent = obj.agent;
-
-      return request(nextOptions);
-    })
-    .then((res) => {
-      try {
-        /** JSON.parse will decode unicode */
-        const results = JSON.stringify(JSON.parse(res.slice(5)));
-
-        return results;
-      } catch (e) {
-        /** throws if not valid JSON, so just return unaltered res string */
-        return res;
-      }
-    });
+          return results;
+        } catch (e) {
+          /** throws if not valid JSON, so just return unaltered res string */
+          return res;
+        }
+      });
   };
 }
 
@@ -337,18 +379,65 @@ export function getTrendingResults(request) {
 
     if (obj.agent) options.agent = obj.agent;
 
-    options.qs = {...options.qs, ...searchTypeMap[searchType].extraParams};
+    options.qs = { ...options.qs, ...searchTypeMap[searchType].extraParams };
 
     return request(options)
-    .then((res) => {
-      try {
-        /** JSON.parse will decode unicode */
-        return JSON.stringify(JSON.parse(res.slice(5)));
-      } catch (e) {
-        /** throws if not valid JSON, so just return unaltered res string */
-        return res;
-      }
-    });
+      .then((res) => {
+        try {
+          /** JSON.parse will decode unicode */
+          return JSON.stringify(JSON.parse(res.slice(5)));
+        } catch (e) {
+          /** throws if not valid JSON, so just return unaltered res string */
+          return res;
+        }
+      });
+  };
+}
+
+export function getTrendingResultsV2(request) {
+  return (searchType, obj) => {
+    const searchTypeMap = {
+      'Daily trends': {
+        path: '/_/TrendsUi/data/batchexecute',
+        body: querystring.stringify({
+          'f.req': `[[["i0OFE","[null,null,\\"${obj.geo}\\",0,\\"en\\",24,1]",null,"generic"]]]`,
+        }),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        },
+      },
+      'Real time trends': {
+        path: '/trends/api/realtimetrends',
+        extraParams: {
+          fi: 0,
+          fs: 0,
+          ri: 300, // # of trending stories IDs returned
+          rs: 20,
+          sort: 0,
+        },
+      },
+    };
+
+    const options = {
+      ...searchTypeMap[searchType],
+      method: 'POST',
+      host: 'trends.google.com',
+      path: searchTypeMap[searchType].path,
+      headers: searchTypeMap[searchType].headers,
+    };
+
+    if (obj.agent) options.agent = obj.agent;
+
+    return request(options)
+      .then((res) => {
+        try {
+          /** JSON.parse will decode unicode */
+          return extractJsonFromResponse(res.slice(5));
+        } catch (e) {
+          /** throws if not valid JSON, so just return unaltered res string */
+          return res;
+        }
+      });
   };
 }
 
@@ -363,12 +452,13 @@ export function constructTrendingObj(obj, cbFunc) {
     }
 
     const date = new Date();
-    const defaults = { hl: 'en-US',
-                      category: 'all',
-                      timezone: date.getTimezoneOffset(),
-                      trendDate: date,
-                      ns: 15,
-                    };
+    const defaults = {
+      hl: 'en-US',
+      category: 'all',
+      timezone: date.getTimezoneOffset(),
+      trendDate: date,
+      ns: 15,
+    };
 
     obj = { ...defaults, ...obj }; // Merge user params into obj with defaults
   }
@@ -393,3 +483,4 @@ export function constructTrendingObj(obj, cbFunc) {
     obj,
   };
 }
+
